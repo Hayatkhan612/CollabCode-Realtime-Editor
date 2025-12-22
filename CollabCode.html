@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CollabCode | Cyberpunk Real-Time Editor</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/editor/editor.main.min.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --void-black: #050505;
+            --deep-purple: #0a0a14;
+            --neon-violet: #7c3aed;
+            --neon-cyan: #06b6d4;
+            --neon-pink: #ec4899;
+            --glass-bg: rgba(20, 20, 30, 0.6);
+            --glass-border: rgba(124, 58, 237, 0.2);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--void-black);
+            color: #e0e0e0;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* Animated Gradient Background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(6, 182, 212, 0.1) 0%, transparent 50%);
+            animation: gradientShift 15s ease infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Header - Floating Glass */
+        .header {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            right: 16px;
+            height: 64px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(124, 58, 237, 0.1);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--neon-violet), var(--neon-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .room-id-input {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--neon-violet);
+            padding: 8px 16px;
+            border-radius: 8px;
+            color: #fff;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            width: 200px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            background: rgba(0, 0, 0, 0.4);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-dot.connected { background: #10b981; }
+        .status-dot.disconnected { background: #ef4444; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        .user-avatars {
+            display: flex;
+            gap: -8px;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+            border: 2px solid var(--void-black);
+            color: #fff;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Main Container */
+        .main-container {
+            position: fixed;
+            top: 96px;
+            left: 16px;
+            right: 16px;
+            bottom: 16px;
+            display: flex;
+            gap: 16px;
+        }
+
+        /* Sidebar - File Explorer */
+        .sidebar {
+            width: 280px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 16px;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(124, 58, 237, 0.1);
+        }
+
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(124, 58, 237, 0.2);
+        }
+
+        .sidebar-title {
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--neon-violet);
+            letter-spacing: 1px;
+        }
+
+        .add-file-btn {
+            background: transparent;
+            border: none;
+            color: var(--neon-cyan);
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s ease;
+        }
+
+        .add-file-btn:hover {
+            transform: scale(1.2);
+            color: var(--neon-violet);
+        }
+
+        .file-list {
+            list-style: none;
+        }
+
+        .file-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-left: 3px solid transparent;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+
+        .file-item:hover {
+            background: rgba(124, 58, 237, 0.1);
+            border-left-color: var(--neon-cyan);
+        }
+
+        .file-item.active {
+            background: rgba(124, 58, 237, 0.2);
+            border-left-color: var(--neon-violet);
+            box-shadow: 0 0 20px rgba(124, 58, 237, 0.3);
+        }
+
+        .file-icon {
+            color: var(--neon-cyan);
+        }
+
+        /* Editor Container */
+        .editor-container {
+            flex: 1;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 8px 32px rgba(124, 58, 237, 0.1);
+        }
+
+        .editor-header {
+            height: 48px;
+            background: rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .current-file-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: var(--neon-cyan);
+            font-weight: 600;
+        }
+
+        #editor {
+            width: 100%;
+            height: calc(100% - 48px);
+        }
+
+        /* Terminal/Chat Panel */
+        .bottom-panel {
+            position: fixed;
+            bottom: 16px;
+            left: 312px;
+            right: 16px;
+            height: 300px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            overflow: hidden;
+            transform: translateY(calc(100% + 16px));
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 8px 32px rgba(124, 58, 237, 0.1);
+        }
+
+        .bottom-panel.open {
+            transform: translateY(0);
+        }
+
+        .panel-toggle {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--neon-violet), var(--neon-cyan));
+            border: none;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 1001;
+            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        .panel-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        .panel-tabs {
+            display: flex;
+            background: rgba(0, 0, 0, 0.4);
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .panel-tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+        }
+
+        .panel-tab.active {
+            color: var(--neon-violet);
+            border-bottom-color: var(--neon-violet);
+        }
+
+        .panel-content {
+            height: calc(100% - 44px);
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .chat-messages {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .chat-message {
+            display: flex;
+            gap: 12px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .chat-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
+        .chat-content {
+            flex: 1;
+        }
+
+        .chat-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .chat-name {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .chat-time {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .chat-text {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .chat-input-container {
+            display: flex;
+            gap: 8px;
+            margin-top: auto;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--neon-violet);
+            padding: 10px 16px;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .chat-send-btn {
+            background: linear-gradient(135deg, var(--neon-violet), var(--neon-cyan));
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .chat-send-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4);
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            top: 96px;
+            right: 24px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .toast {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 300px;
+            animation: slideInRight 0.4s ease;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(100px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .toast-icon {
+            font-size: 20px;
+        }
+
+        .toast.success .toast-icon { color: #10b981; }
+        .toast.error .toast-icon { color: #ef4444; }
+        .toast.info .toast-icon { color: var(--neon-cyan); }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .toast-message {
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--neon-violet);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--neon-cyan);
+        }
+
+        /* Loading Spinner */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 5, 5, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            transition: opacity 0.4s ease;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid rgba(124, 58, 237, 0.2);
+            border-top: 4px solid var(--neon-violet);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 24px;
+            font-size: 16px;
+            color: var(--neon-cyan);
+            font-weight: 600;
+        }
+
+        /* Modal for Name Input */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 4000;
+        }
+
+        .modal {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 32px;
+            width: 400px;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--neon-violet), var(--neon-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .modal-subtitle {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 24px;
+        }
+
+        .modal-input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--neon-violet);
+            padding: 12px 16px;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .modal-btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--neon-violet), var(--neon-cyan));
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            color: #fff;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .modal-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 200px;
+            }
+            .room-id-input {
+                width: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text">Initializing CollabCode...</div>
+    </div>
+
+    <div class="modal-overlay" id="nameModal">
+        <div class="modal">
+            <h2 class="modal-title">Welcome to CollabCode</h2>
+            <p class="modal-subtitle">Enter your name to start collaborating</p>
+            <input type="text" class="modal-input" id="nameInput" placeholder="Your Name" maxlength="20">
+            <button class="modal-btn" id="nameSubmitBtn">Start Coding</button>
+        </div>
+    </div>
+
+    <div class="header">
+        <div class="header-left">
+            <div class="logo"><i class="fas fa-code"></i> CollabCode</div>
+            <input type="text" class="room-id-input" id="roomIdInput" placeholder="Room ID" value="default-room">
+        </div>
+        <div class="status-badge">
+            <div class="status-dot disconnected" id="statusDot"></div>
+            <span id="statusText">Disconnected</span>
+        </div>
+        <div class="user-avatars" id="userAvatars"></div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">Files</div>
+                <button class="add-file-btn" id="addFileBtn"><i class="fas fa-plus"></i></button>
+            </div>
+            <ul class="file-list" id="fileList">
+                <li class="file-item active" data-file="index.html">
+                    <i class="fas fa-file-code file-icon"></i>
+                    <span>index.html</span>
+                </li>
+                <li class="file-item" data-file="styles.css">
+                    <i class="fas fa-file-code file-icon"></i>
+                    <span>styles.css</span>
+                </li>
+                <li class="file-item" data-file="script.js">
+                    <i class="fas fa-file-code file-icon"></i>
+                    <span>script.js</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="editor-container">
+            <div class="editor-header">
+                <i class="fas fa-file-code" style="color: var(--neon-cyan); margin-right: 8px;"></i>
+                <span class="current-file-name" id="currentFileName">index.html</span>
+            </div>
+            <div id="editor"></div>
+        </div>
+    </div>
+
+    <button class="panel-toggle" id="panelToggle">
+        <i class="fas fa-comment-dots"></i>
+    </button>
+
+    <div class="bottom-panel" id="bottomPanel">
+        <div class="panel-tabs">
+            <button class="panel-tab active" data-tab="chat">
+                <i class="fas fa-comments"></i> Chat
+            </button>
+            <button class="panel-tab" data-tab="terminal">
+                <i class="fas fa-terminal"></i> Terminal
+            </button>
+        </div>
+        <div class="panel-content" id="panelContent">
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input-container">
+                <input type="text" class="chat-input" id="chatInput" placeholder="Type a message...">
+                <button class="chat-send-btn" id="chatSendBtn">
+                    <i class="fas fa-paper-plane"></i> Send
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+    
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+        import { getDatabase, ref, set, onValue, update, off, serverTimestamp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js';
+
+        // ==================== FIREBASE CONFIG ====================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDX3fTyEsHJeiTn-2Qmqsq1E03wpx-LnUA",
+            authDomain: "for-linkedin-resume.firebaseapp.com",
+            projectId: "for-linkedin-resume",
+            storageBucket: "for-linkedin-resume.firebasestorage.app",
+            messagingSenderId: "90221086536",
+            appId: "1:90221086536:web:f7110ab8d556e02759957d",
+            measurementId: "G-Z2VL996LRK"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // ==================== GLOBAL STATE ====================
+        let monacoEditor;
+        let currentUserId = 'user_' + Math.random().toString(36).substr(2, 9);
+        let currentRoomId = 'default-room';
+        let currentUserName = '';
+        let currentUserColor = '#' + Math.floor(Math.random()*16777215).toString(16);
+        let activeFile = 'index.html';
+        let isRemoteUpdate = false; // CRITICAL: Prevents infinite loop
+        let activeListener = null; // CRITICAL: Prevents listener leak
+        let writeDebounceTimer = null;
+        let cursorDecorations = [];
+        let allUsers = {};
+
+        // ==================== UTILITY FUNCTIONS ====================
+        function sanitizeFileName(fileName) {
+            return fileName.replace(/[.#$[\]]/g, '_');
+        }
+
+        function showToast(type, title, message) {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const iconMap = {
+                success: 'fa-check-circle',
+                error: 'fa-exclamation-circle',
+                info: 'fa-info-circle'
+            };
+            
+            toast.innerHTML = `
+                <i class="fas ${iconMap[type]} toast-icon"></i>
+                <div class="toast-content">
+                    <div class="toast-title">${title}</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+            `;
+            
+            document.getElementById('toastContainer').appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideInRight 0.4s ease reverse';
+                setTimeout(() => toast.remove(), 400);
+            }, 3000);
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            if (connected) {
+                statusDot.className = 'status-dot connected';
+                statusText.textContent = 'Connected';
+                showToast('success', 'Connected', 'You are now connected to the room');
+            } else {
+                statusDot.className = 'status-dot disconnected';
+                statusText.textContent = 'Disconnected';
+                showToast('error', 'Disconnected', 'Connection lost');
+            }
+        }
+
+        function renderUserAvatars() {
+            const container = document.getElementById('userAvatars');
+            container.innerHTML = '';
+            
+            Object.values(allUsers).forEach(user => {
+                const avatar = document.createElement('div');
+                avatar.className = 'user-avatar';
+                avatar.style.background = user.color;
+                avatar.textContent = user.name.charAt(0).toUpperCase();
+                avatar.title = user.name;
+                container.appendChild(avatar);
+            });
+        }
+
+        // ==================== MONACO EDITOR SETUP ====================
+        function initializeMonaco() {
+            require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }});
+            
+            require(['vs/editor/editor.main'], function() {
+                // Define Cyberpunk Theme
+                monaco.editor.defineTheme('cyberpunk', {
+                    base: 'vs-dark',
+                    inherit: true,
+                    rules: [
+                        { token: 'comment', foreground: '6A9955', fontStyle: 'italic' },
+                        { token: 'keyword', foreground: '7C3AED', fontStyle: 'bold' },
+                        { token: 'string', foreground: '06B6D4' },
+                        { token: 'number', foreground: 'EC4899' },
+                        { token: 'function', foreground: '06B6D4' },
+                        { token: 'variable', foreground: 'E0E0E0' }
+                    ],
+                    colors: {
+                        'editor.background': '#0a0a14',
+                        'editor.foreground': '#e0e0e0',
+                        'editorCursor.foreground': '#7C3AED',
+                        'editor.lineHighlightBackground': '#1a1a2e',
+                        'editorLineNumber.foreground': '#4a4a5a',
+                        'editor.selectionBackground': '#7C3AED40',
+                        'editor.inactiveSelectionBackground': '#7C3AED20'
+                    }
+                });
+
+                monacoEditor = monaco.editor.create(document.getElementById('editor'), {
+                    value: '',
+                    language: 'html',
+                    theme: 'cyberpunk',
+                    fontSize: 14,
+                    fontFamily: 'JetBrains Mono, monospace',
+                    automaticLayout: true,
+                    minimap: { enabled: true },
+                    scrollBeyondLastLine: false,
+                    smoothScrolling: true,
+                    cursorBlinking: 'smooth',
+                    renderWhitespace: 'selection',
+                    domReadOnly: false, // CRITICAL: Mobile compatibility
+                    accessibilitySupport: 'on' // CRITICAL: Mobile compatibility
+                });
+
+                // ==================== CHANGE EVENT ====================
+                monacoEditor.onDidChangeModelContent((e) => {
+                    if (isRemoteUpdate) return; // CRITICAL: Prevent infinite loop
+                    
+                    clearTimeout(writeDebounceTimer);
+                    writeDebounceTimer = setTimeout(() => {
+                        const code = monacoEditor.getValue();
+                        const sanitizedFile = sanitizeFileName(activeFile);
+                        const codeRef = ref(db, `rooms/${currentRoomId}/files/${sanitizedFile}/code`);
+                        
+                        set(codeRef, code).then(() => {
+                            showToast('info', 'Saved', 'Changes synced');
+                        });
+                    }, 300); // Debounce: 300ms
+                });
+
+                // ==================== CURSOR EVENT ====================
+                monacoEditor.onDidChangeCursorPosition((e) => {
+                    const position = e.position;
+                    const cursorRef = ref(db, `rooms/${currentRoomId}/cursors/${currentUserId}`);
+                    
+                    update(cursorRef, {
+                        line: position.lineNumber,
+                        column: position.column,
+                        currentFile: activeFile,
+                        timestamp: serverTimestamp()
+                    });
+                });
+
+                setupFirebaseListeners();
+                hideLoadingOverlay();
+                updateConnectionStatus(true);
+            });
+        }
+
+        // ==================== FIREBASE LISTENERS ====================
+        function setupFirebaseListeners() {
+            // Listen to current file code changes
+            listenToFileCode(activeFile);
+            
+            // Listen to presence
+            const usersRef = ref(db, `rooms/${currentRoomId}/users`);
+            onValue(usersRef, (snapshot) => {
+                allUsers = snapshot.val() || {};
+                renderUserAvatars();
+            });
+
+            // Listen to cursors
+            const cursorsRef = ref(db, `rooms/${currentRoomId}/cursors`);
+            onValue(cursorsRef, (snapshot) => {
+                renderCursors(snapshot.val() || {});
+            });
+
+            // Update own presence
+            const myPresenceRef = ref(db, `rooms/${currentRoomId}/users/${currentUserId}`);
+            set(myPresenceRef, {
+                name: currentUserName,
+                color: currentUserColor,
+                currentFile: activeFile,
+                lastActive: serverTimestamp()
+            });
+        }
+
+        function listenToFileCode(fileName) {
+            // CRITICAL: Clean up old listener to prevent leak
+            if (activeListener) {
+                off(activeListener);
+            }
+
+            const sanitizedFile = sanitizeFileName(fileName);
+            const codeRef = ref(db, `rooms/${currentRoomId}/files/${sanitizedFile}/code`);
+            
+            activeListener = codeRef; // Store reference
+            
+            onValue(codeRef, (snapshot) => {
+                const code = snapshot.val();
+                if (code !== null && code !== monacoEditor.getValue()) {
+                    isRemoteUpdate = true; // CRITICAL: Set flag
+                    monacoEditor.setValue(code);
+                    isRemoteUpdate = false; // CRITICAL: Unset flag
+                }
+            });
+        }
+
+        // ==================== CURSOR RENDERING ====================
+        function renderCursors(cursorsData) {
+            const decorationsArray = [];
+            
+            // Clear existing cursor styles
+            const existingStyles = document.querySelectorAll('style[data-cursor-style]');
+            existingStyles.forEach(s => s.remove());
+
+            Object.entries(cursorsData).forEach(([userId, cursorData]) => {
+                if (userId === currentUserId) return;
+                
+                // CRITICAL: Ghost cursor prevention
+                if (cursorData.currentFile !== activeFile) return;
+
+                const user = allUsers[userId];
+                if (!user) return;
+
+                const { line, column } = cursorData;
+                const color = user.color;
+                const name = user.name;
+
+                // Create decoration
+                decorationsArray.push({
+                    range: new monaco.Range(line, column, line, column),
+                    options: {
+                        className: `cursor-${userId}`,
+                        stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
+                    }
+                });
+
+                // Inject CSS for this cursor
+                const style = document.createElement('style');
+                style.setAttribute('data-cursor-style', userId);
+                style.innerHTML = `
+                    .cursor-${userId} {
+                        border-left: 2px solid ${color} !important;
+                        position: relative;
+                    }
+                    .cursor-${userId}::after {
+                        content: '${name}';
+                        position: absolute;
+                        top: -20px;
+                        left: 0;
+                        background: ${color};
+                        color: #fff;
+                        padding: 2px 6px;
+                        border-radius: 4px;
+                        font-size: 11px;
+                        font-weight: 600;
+                        white-space: nowrap;
+                        pointer-events: none;
+                        z-index: 1000;
+                    }
+                `;
+                document.head.appendChild(style);
+            });
+
+            cursorDecorations = monacoEditor.deltaDecorations(cursorDecorations, decorationsArray);
+        }
+
+        // ==================== FILE SWITCHING ====================
+        function switchFile(fileName) {
+            clearTimeout(writeDebounceTimer);
+            if (fileName === activeFile) return;
+            
+            activeFile = fileName;
+            document.getElementById('currentFileName').textContent = fileName;
+            
+            // Update UI
+            document.querySelectorAll('.file-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.file === fileName) {
+                    item.classList.add('active');
+                }
+            });
+
+            // Update language mode
+            const languageMap = {
+                'html': 'html',
+                'css': 'css',
+                'js': 'javascript',
+                'json': 'json',
+                'md': 'markdown'
+            };
+            const extension = fileName.split('.').pop();
+            const language = languageMap[extension] || 'plaintext';
+            monaco.editor.setModelLanguage(monacoEditor.getModel(), language);
+
+            // Update presence
+            const myPresenceRef = ref(db, `rooms/${currentRoomId}/users/${currentUserId}`);
+            update(myPresenceRef, { currentFile: fileName });
+
+            // Switch listener
+            listenToFileCode(fileName);
+        }
+
+        // ==================== UI EVENT HANDLERS ====================
+        document.getElementById('nameSubmitBtn').addEventListener('click', () => {
+            const name = document.getElementById('nameInput').value.trim();
+            if (name.length > 0) {
+                currentUserName = name;
+                document.getElementById('nameModal').style.display = 'none';
+                initializeMonaco();
+            }
+        });
+
+        document.getElementById('nameInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('nameSubmitBtn').click();
+            }
+        });
+
+        document.getElementById('addFileBtn').addEventListener('click', () => {
+            const fileName = prompt('Enter file name (e.g., app.js):');
+            if (fileName && fileName.trim()) {
+                const fileList = document.getElementById('fileList');
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                li.dataset.file = fileName;
+                li.innerHTML = `
+                    <i class="fas fa-file-code file-icon"></i>
+                    <span>${fileName}</span>
+                `;
+                fileList.appendChild(li);
+                
+                li.addEventListener('click', () => switchFile(fileName));
+                showToast('success', 'File Created', `${fileName} added to workspace`);
+            }
+        });
+
+        document.getElementById('fileList').addEventListener('click', (e) => {
+            const fileItem = e.target.closest('.file-item');
+            if (fileItem) {
+                switchFile(fileItem.dataset.file);
+            }
+        });
+
+        document.getElementById('panelToggle').addEventListener('click', () => {
+            document.getElementById('bottomPanel').classList.toggle('open');
+        });
+
+        document.getElementById('roomIdInput').addEventListener('change', (e) => {
+            currentRoomId = e.target.value || 'default-room';
+            location.reload(); // Reload to reconnect
+        });
+
+        // ==================== CHAT FUNCTIONALITY ====================
+        document.getElementById('chatSendBtn').addEventListener('click', sendChatMessage);
+        document.getElementById('chatInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendChatMessage();
+        });
+
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const chatRef = ref(db, `rooms/${currentRoomId}/chat/${Date.now()}`);
+            set(chatRef, {
+                userId: currentUserId,
+                name: currentUserName,
+                color: currentUserColor,
+                message: message,
+                timestamp: serverTimestamp()
+            });
+
+            input.value = '';
+        }
+
+        // Listen to chat messages
+        const chatRef = ref(db, `rooms/${currentRoomId}/chat`);
+        onValue(chatRef, (snapshot) => {
+            const messages = snapshot.val() || {};
+            const container = document.getElementById('chatMessages');
+            container.innerHTML = '';
+
+            Object.values(messages)
+                .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+                .forEach(msg => {
+                    const messageEl = document.createElement('div');
+                    messageEl.className = 'chat-message';
+                    
+                    const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : 'Now';
+                    
+                    messageEl.innerHTML = `
+                        <div class="chat-avatar" style="background: ${msg.color}">
+                            ${msg.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div class="chat-content">
+                            <div class="chat-header">
+                                <span class="chat-name" style="color: ${msg.color}">${msg.name}</span>
+                                <span class="chat-time">${time}</span>
+                            </div>
+                            <div class="chat-text">${msg.message}</div>
+                        </div>
+                    `;
+                    container.appendChild(messageEl);
+                });
+
+            container.scrollTop = container.scrollHeight;
+        });
+
+        function hideLoadingOverlay() {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
